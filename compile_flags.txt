@@ -1,0 +1,4 @@
+-std=c++11
+-I/path/to/includes
+-DDEBUG
+-Wall
