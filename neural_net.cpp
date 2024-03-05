@@ -86,6 +86,7 @@ struct Layer {
     }
 
     std::vector<std::vector<double> > softmax_derivative(std::vector<double> inputs) {
+        // jacobian[i][j] is the partial derivative of probability of i with respect with the raw relu value of j
         std::vector<std::vector<double> > jacobian;
         std::vector<double> probabilities = softmax(inputs);
 
@@ -93,7 +94,7 @@ struct Layer {
             std::vector<double> row;
             for (int j = 0; j < inputs.size(); j++) {
                 double probability = probabilities[j];
-                row.push_back(probability * exp(inputs[j]) * ((i == j) ? 1.0 - probability : -probability));
+                row.push_back(probability * ((i == j) ? 1.0 - probability : -probability));
             }
             jacobian.push_back(row);
         }
