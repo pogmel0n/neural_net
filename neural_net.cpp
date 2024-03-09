@@ -2,20 +2,24 @@
 #include <random>
 #include <vector>
 
+#define LEARN_RATE 0.01
+#define OUTPUT 2
+
 struct DataPoint {
     std::vector<double> inputs;
+	int correct_output;
     std::vector<double> expected_outputs;
 
     DataPoint(std::vector<double> in, int correct_output) {
         inputs = in;
-        expected_outputs = std::vector<double>(10);
+        expected_outputs = std::vector<double>(OUTPUT);
         expected_outputs[correct_output] = 1;
     }
 };
 
 struct Layer {
 	int input_size, output_size;
-    // weights[i][j] is the weight from the ith input node to the jth output node
+    // weights[j][k] is the weight from the kth input node to the jth output node
 	std::vector<std::vector<double> > weights;
 	std::vector<double> biases;
     std::vector<double> outputs;
@@ -38,9 +42,9 @@ struct Layer {
 
         // Initialize weights matrix
         std::vector<std::vector<double>> weights(input_size, std::vector<double>(output_size));
-        for (int i = 0; i < input_size; ++i) {
+        for (int k = 0; k < input_size; ++i) {
             for (int j = 0; j < output_size; ++j) {
-                weights[i][j] = dist(gen); // Sample from normal distribution
+                weights[j][k] = dist(gen); // Sample from normal distribution
             }
         }
 
@@ -48,12 +52,12 @@ struct Layer {
     }
 
 	std::vector<double> calc_outputs(std::vector<double> inputs, bool output_layer) {
-		for (int i = 0; i < output_size; i++) {
-			double output = biases[i];
-			for (int j = 0; j < input_size; j++) {
-				output += (inputs[j] * weights[j][i]);
+		for (int j = 0; j < output_size; i++) {
+			double output = biases[j];
+			for (int k = 0; k < input_size; k++) {
+				output += (inputs[k] * weights[j][k]);
 			}
-			outputs[i] = relu(output);
+			outputs[j] = relu(output);
 		}
 		
         if (output_layer) {
@@ -93,8 +97,7 @@ struct Layer {
         for (int i = 0; i < inputs.size(); i++) {
             std::vector<double> row;
             for (int j = 0; j < inputs.size(); j++) {
-                double probability = probabilities[j];
-                row.push_back(probability * ((i == j) ? 1.0 - probability : -probability));
+                row.push_back(probabilities[i] * ((i == j) ? 1.0 - probabilities[i]: -probabilities[j]));
             }
             jacobian.push_back(row);
         }
@@ -103,15 +106,25 @@ struct Layer {
     }
 
     double node_cost(double activation, double target) {
-        double error = target - activation;
-        return error * error;
+		return -target * std::log(activation);
     }
     
-    double node_cost_derivative(double activation, double target) {
-        return 2 * (target - activation);
+    double node_cost_derivative(double activation) {
+        return -1 / activation;
     }
 
-    std::vector<double> node_gradient(std::vector<double> expected_output) {
+	std::vector<double> weight_gradient(std::vector<DataPoint> data) {
+		std::vector<std::vector<double> > softmax_jacobian = softmax_derivative(data.inputs);
+		for (int j = 0; j < output_size; j++) {
+			for (int k = 0; k < input_size; k++) {
+				double node_slope = LEARN_RATE * node_cost_derivative(outputs[j]) * softmax_jacobian[data.correct_output][j] * relu_derivative(outputs[j]);
+				weights[j][k] -= node_slope * outputs[j];
+				biases[j] -= node_slope;
+			}
+		}
+	}
+
+    std::vector<double> negative_gradient(std::vector<double> expected_output) {
         std::vector<double> node_gradient = std::vector<double>(expected_output.size());
         for (int i = 0; i < expected_output.size(); i++) {
             double cost_derivative = node_cost_derivative(outputs[i], expected_output[i]);
